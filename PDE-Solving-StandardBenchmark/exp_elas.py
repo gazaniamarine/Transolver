@@ -29,6 +29,9 @@ parser.add_argument('--ref', type=int, default=8)
 parser.add_argument('--slice_num', type=int, default=32)
 parser.add_argument('--eval', type=int, default=0)
 parser.add_argument('--save_name', type=str, default='elas_Transolver')
+parser.add_argument('--scheduler', type=str, default='cosine', choices=['cosine', 'step'])
+parser.add_argument('--step_size', type=int, default=100)
+parser.add_argument('--gamma', type=float, default=0.5)
 parser.add_argument('--data_path', type=str, default='/data/fno')
 args = parser.parse_args()
 eval = args.eval
@@ -100,6 +103,8 @@ def main():
     count_parameters(model)
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    if args.scheduler == 'step':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
     
     myloss = TestLoss(size_average=False)
 

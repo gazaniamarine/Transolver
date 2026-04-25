@@ -320,8 +320,31 @@ def get_shape(data, max_n_point=8192, normalize=True, use_height=False):
 
 
 def create_edge_index_radius(data, r, max_neighbors=32):
-    data.edge_index = nng.radius_graph(x=data.pos, r=r, loop=True, max_num_neighbors=max_neighbors)
-    # print(f'r = {r}, #edges = {data.edge_index.size(1)}')
+    try:
+        from torch_geometric import nn as nng
+        data.edge_index = nng.radius_graph(x=data.pos, r=r, loop=True, max_num_neighbors=max_neighbors)
+    except (ImportError, RuntimeError):
+        # Robust Fallback using Scipy when torch-cluster is missing or broken
+        from scipy.spatial import KDTree
+        import torch
+        
+        pos_np = data.pos.cpu().numpy()
+        tree = KDTree(pos_np)
+        
+        # query_ball_tree finds all neighbors within distance r
+        adj_list = tree.query_ball_tree(tree, r)
+        
+        row, col = [], []
+        for i, neighbors in enumerate(adj_list):
+            # Limit to max_neighbors to maintain consistency with PyG behavior
+            if len(neighbors) > max_neighbors:
+                neighbors = neighbors[:max_neighbors]
+            for j in neighbors:
+                row.append(i)
+                col.append(j)
+        
+        data.edge_index = torch.tensor([row, col], dtype=torch.long, device=data.pos.device)
+        
     return data
 
 
@@ -349,8 +372,8 @@ if __name__ == '__main__':
 
     file_name = '1a0bc9ab92c915167ae33d942430658c'
 
-    root = '/data/PDE_data/mlcfd_data/training_data'
-    save_path = '/data/PDE_data/mlcfd_data/preprocessed_data/param0/' + file_name
+    root = 'Car-Design-ShapeNetCar/dataset/mlcfd_data/mlcfd_data/training_data'
+    save_path = 'Car-Design-ShapeNetCar/dataset/mlcfd_data/mlcfd_data/preprocessed_data/param0/' + file_name
     file_name_press = 'param0/' + file_name + '/quadpress_smpl.vtk'
     file_name_velo = 'param0/' + file_name + '/hexvelo_smpl.vtk'
     file_name_press = os.path.join(root, file_name_press)

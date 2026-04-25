@@ -28,6 +28,9 @@ parser.add_argument('--ref', type=int, default=8)
 parser.add_argument('--slice_num', type=int, default=32)
 parser.add_argument('--eval', type=int, default=0)
 parser.add_argument('--save_name', type=str, default='airfoil_Transolver')
+parser.add_argument('--scheduler', type=str, default='onecycle', choices=['onecycle', 'step'])
+parser.add_argument('--step_size', type=int, default=100)
+parser.add_argument('--gamma', type=float, default=0.5)
 parser.add_argument('--data_path', type=str, default='/data/fno/airfoil/naca')
 args = parser.parse_args()
 eval = args.eval
@@ -108,6 +111,8 @@ def main():
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epochs,
                                                     steps_per_epoch=len(train_loader))
+    if args.scheduler == 'step':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
     myloss = TestLoss(size_average=False)
 
     if eval:
@@ -195,7 +200,11 @@ def main():
                 if args.max_grad_norm is not None:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
+                if args.scheduler == 'onecycle':
+                    scheduler.step()
                 train_loss += loss.item()
+
+            if args.scheduler == 'step':
                 scheduler.step()
 
             train_loss = train_loss / ntrain

@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser('Training Transolver')
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--epochs', type=int, default=500)
 parser.add_argument('--weight_decay', type=float, default=1e-5)
-parser.add_argument('--model', type=str, default='Transolver_2D')
+parser.add_argument('--model', type=str, default='Transolver_Structured_Mesh_2D')
 parser.add_argument('--n-hidden', type=int, default=64, help='hidden dim')
 parser.add_argument('--n-layers', type=int, default=3, help='layers')
 parser.add_argument('--n-heads', type=int, default=4)
@@ -32,7 +32,10 @@ parser.add_argument('--ref', type=int, default=8)
 parser.add_argument('--slice_num', type=int, default=32)
 parser.add_argument('--eval', type=int, default=0)
 parser.add_argument('--save_name', type=str, default='darcy_Transolver')
-parser.add_argument('--data_path', type=str, default='/data/fno')
+parser.add_argument('--scheduler', type=str, default='onecycle', choices=['onecycle', 'step'])
+parser.add_argument('--step_size', type=int, default=100)
+parser.add_argument('--gamma', type=float, default=0.5)
+parser.add_argument('--data_path', type=str, default='data/darcy_421')
 args = parser.parse_args()
 
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -66,6 +69,37 @@ def central_diff(x: torch.Tensor, h, resolution):
     grad_y = (x[:, 2:, 1:-1, :] - x[:, :-2, 1:-1, :]) / (2 * h)  # f(x+h) - f(x-h) / 2h
 
     return grad_x, grad_y
+
+
+def plot_comparison(gt, pred, error, input, save_path, case_id):
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+    
+    # Input
+    im0 = axes[0].imshow(input, cmap='coolwarm')
+    axes[0].set_title(f'Input (Case {case_id})')
+    fig.colorbar(im0, ax=axes[0])
+    
+    # Ground Truth
+    im1 = axes[1].imshow(gt, cmap='coolwarm')
+    axes[1].set_title('Ground Truth')
+    fig.colorbar(im1, ax=axes[1])
+    
+    # Prediction
+    im2 = axes[2].imshow(pred, cmap='coolwarm')
+    axes[2].set_title('Prediction')
+    fig.colorbar(im2, ax=axes[2])
+    
+    # Error
+    im3 = axes[3].imshow(error, cmap='coolwarm')
+    axes[3].set_title('Error (GT - Pred)')
+    fig.colorbar(im3, ax=axes[3])
+    
+    for ax in axes:
+        ax.axis('off')
+        
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, f"case_{case_id}_comparison.png"))
+    plt.close()
 
 
 def main():
@@ -137,6 +171,9 @@ def main():
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=epochs,
                                                     steps_per_epoch=len(train_loader))
+    if args.scheduler == 'step':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
+    
     myloss = TestLoss(size_average=False)
     de_x = TestLoss(size_average=False)
     de_y = TestLoss(size_average=False)
@@ -164,44 +201,21 @@ def main():
                     rel_err += tl
 
                     if id < showcase:
-                        print(id)
-                        plt.figure()
-                        plt.axis('off')
-                        plt.imshow(out[0, :].reshape(85, 85).detach().cpu().numpy(), cmap='coolwarm')
-                        plt.colorbar()
-                        plt.savefig(
-                            os.path.join('./results/' + save_name + '/',
-                                         "case_" + str(id) + "_pred.pdf"))
-                        plt.close()
-                        # ============ #
-                        plt.figure()
-                        plt.axis('off')
-                        plt.imshow(y[0, :].reshape(85, 85).detach().cpu().numpy(), cmap='coolwarm')
-                        plt.colorbar()
-                        plt.savefig(
-                            os.path.join('./results/' + save_name + '/', "case_" + str(id) + "_gt.pdf"))
-                        plt.close()
-                        # ============ #
-                        plt.figure()
-                        plt.axis('off')
-                        plt.imshow((y[0, :] - out[0, :]).reshape(85, 85).detach().cpu().numpy(), cmap='coolwarm')
-                        plt.colorbar()
-                        plt.clim(-0.0005, 0.0005)
-                        plt.savefig(
-                            os.path.join('./results/' + save_name + '/', "case_" + str(id) + "_error.pdf"))
-                        plt.close()
-                        # ============ #
-                        plt.figure()
-                        plt.axis('off')
-                        plt.imshow((fx[0, :].unsqueeze(-1)).reshape(85, 85).detach().cpu().numpy(), cmap='coolwarm')
-                        plt.colorbar()
-                        plt.savefig(
-                            os.path.join('./results/' + save_name + '/', "case_" + str(id) + "_input.pdf"))
-                        plt.close()
+                        print(f"Visualizing case {id}")
+                        res = 85 # for Darcy, 421/5 = 84 + 1 = 85
+                        input_field = fx[0, :].reshape(res, res).detach().cpu().numpy()
+                        gt_field = y[0, :].reshape(res, res).detach().cpu().numpy()
+                        pred_field = out[0, :].reshape(res, res).detach().cpu().numpy()
+                        error_field = gt_field - pred_field
+                        
+                        plot_comparison(gt_field, pred_field, error_field, input_field,
+                                         './results/' + save_name + '/', id)
 
             rel_err /= ntest
             print("rel_err:{}".format(rel_err))
     else:
+        train_loss_history = []
+        test_err_history = []
         for ep in range(args.epochs):
             model.train()
             train_loss = 0
@@ -231,6 +245,10 @@ def main():
                 optimizer.step()
                 train_loss += l2loss.item()
                 reg += deriv_loss.item()
+                if args.scheduler == 'onecycle':
+                    scheduler.step()
+            
+            if args.scheduler == 'step':
                 scheduler.step()
 
             train_loss /= ntrain
@@ -255,6 +273,8 @@ def main():
 
             rel_err /= ntest
             print("rel_err:{}".format(rel_err))
+            train_loss_history.append(train_loss)
+            test_err_history.append(rel_err)
 
             if ep % 100 == 0:
                 if not os.path.exists('./checkpoints'):
@@ -266,6 +286,42 @@ def main():
             os.makedirs('./checkpoints')
         print('save model')
         torch.save(model.state_dict(), os.path.join('./checkpoints', save_name + '.pt'))
+
+        # Final print
+        print(f"\nTraining finished. Final rel_err: {rel_err:.5f}")
+
+        # Plot loss history
+        plt.figure(figsize=(10, 5))
+        plt.plot(train_loss_history, label='Train Loss')
+        plt.plot(test_err_history, label='Test Rel Err')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss/Error')
+        plt.title('Training and Testing Progress')
+        plt.legend()
+        if not os.path.exists('./results/' + save_name + '/'):
+            os.makedirs('./results/' + save_name + '/')
+        plt.savefig(os.path.join('./results/' + save_name + '/', "loss_curve.png"))
+        plt.close()
+        print(f"Loss curve saved to ./results/{save_name}/loss_curve.png")
+
+        # Save final visualization
+        model.eval()
+        with torch.no_grad():
+            x, fx, y = next(iter(test_loader))
+            x, fx, y = x.cuda(), fx.cuda(), y.cuda()
+            out = model(x, fx=fx.unsqueeze(-1)).squeeze(-1)
+            out = y_normalizer.decode(out)
+            y = y_normalizer.decode(y)
+            
+            res = 85
+            input_field = fx[0, :].reshape(res, res).detach().cpu().numpy()
+            gt_field = y[0, :].reshape(res, res).detach().cpu().numpy()
+            pred_field = out[0, :].reshape(res, res).detach().cpu().numpy()
+            error_field = gt_field - pred_field
+            
+            plot_comparison(gt_field, pred_field, error_field, input_field,
+                             './results/' + save_name + '/', "final")
+            print(f"Final visualization saved to ./results/{save_name}/case_final_comparison.png")
 
 
 if __name__ == "__main__":
