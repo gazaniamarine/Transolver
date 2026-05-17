@@ -162,3 +162,8 @@ cython_debug/
 # Datasets
 Car-Design-ShapeNetCar/dataset/mlcfd_data
 data/
+Garrett_data/
+results/
+checkpoints/
+**/results/
+**/checkpoints/

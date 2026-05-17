@@ -372,8 +372,8 @@ if __name__ == '__main__':
 
     file_name = '1a0bc9ab92c915167ae33d942430658c'
 
-    root = 'Car-Design-ShapeNetCar/dataset/mlcfd_data/mlcfd_data/training_data'
-    save_path = 'Car-Design-ShapeNetCar/dataset/mlcfd_data/mlcfd_data/preprocessed_data/param0/' + file_name
+    root = 'Car-Design-ShapeNetCar/dataset/mlcfd_data/training_data'
+    save_path = 'Car-Design-ShapeNetCar/dataset/mlcfd_data/preprocessed_data/param0/' + file_name
     file_name_press = 'param0/' + file_name + '/quadpress_smpl.vtk'
     file_name_velo = 'param0/' + file_name + '/hexvelo_smpl.vtk'
     file_name_press = os.path.join(root, file_name_press)

@@ -11,8 +11,8 @@ from dataset.dataset import create_edge_index_radius
 
 # Mock args
 class Args:
-    data_dir = os.path.join(repo_root, 'dataset/mlcfd_data/mlcfd_data/training_data')
-    save_dir = os.path.join(repo_root, 'dataset/mlcfd_data/mlcfd_data/preprocessed_data')
+    data_dir = os.path.join(repo_root, 'dataset/mlcfd_data/training_data')
+    save_dir = os.path.join(repo_root, 'dataset/mlcfd_data/preprocessed_data')
     fold_id = 0
     cfd_mesh = False
     r = 0.2
