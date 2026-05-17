@@ -159,7 +159,8 @@ def main(device, train_dataset, val_dataset, Net, hparams, path, criterion='MSE'
         train_dataset_sampled = []
         for data in train_dataset:
             data_sampled = data.clone()
-            idx = random.sample(range(data_sampled.x.size(0)), hparams['subsampling'])
+            n_samples = min(hparams['subsampling'], data_sampled.x.size(0))
+            idx = random.sample(range(data_sampled.x.size(0)), n_samples)
             idx = torch.tensor(idx)
 
             data_sampled.pos = data_sampled.pos[idx]
@@ -199,7 +200,8 @@ def main(device, train_dataset, val_dataset, Net, hparams, path, criterion='MSE'
                         val_dataset_sampled = []
                         for data in val_dataset:
                             data_sampled = data.clone()
-                            idx = random.sample(range(data_sampled.x.size(0)), hparams['subsampling'])
+                            n_samples = min(hparams['subsampling'], data_sampled.x.size(0))
+                            idx = random.sample(range(data_sampled.x.size(0)), n_samples)
                             idx = torch.tensor(idx)
 
                             data_sampled.pos = data_sampled.pos[idx]
