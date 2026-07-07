@@ -4,10 +4,12 @@ Fourier Neural Operator (FNO) Baseline for 2D NS Turbulence
 Trains standard 2D FNO on turbulent Navier-Stokes data (64x64 vorticity fields)
 to provide a rigorous scientific baseline comparison against Transolver.
 
-Uses Nvidia's 'neuraloperator' library implementation directly from source path.
+Uses the 'neuraloperator' library (https://github.com/neuraloperator/neuraloperator).
+Set $NEURALOPERATOR_DIR to a local checkout if it is not pip-installed.
 
 Dataset:  ns_train_64.pt / ns_test_64.pt (x: input vorticity, y: next-step vorticity)
-          Located at /media/HDD/mamta_backup/datasets/fno/navier_stokes/
+          Path is set via --data_path (defaults to the $NS_DATA_DIR
+          environment variable if set).
 """
 
 import sys
@@ -26,8 +28,9 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from tqdm import tqdm
 
-# Add local neuraloperator repository to path
-sys.path.append('/home/gazania/zania_folder/neuraloperator')
+# Add local neuraloperator repository to path, if provided
+if os.environ.get('NEURALOPERATOR_DIR'):
+    sys.path.append(os.environ['NEURALOPERATOR_DIR'])
 from neuralop.models import FNO
 
 from utils.testloss import TestLoss
@@ -38,8 +41,8 @@ from utils.testloss import TestLoss
 parser = argparse.ArgumentParser('FNO — 2D NS Turbulence Prediction')
 
 parser.add_argument('--data_path', type=str,
-                    default='/media/HDD/mamta_backup/datasets/fno/navier_stokes',
-                    help='Path to ns_train_64.pt and ns_test_64.pt')
+                    default=os.environ.get('NS_DATA_DIR', ''),
+                    help='Path to ns_train_64.pt and ns_test_64.pt (or set $NS_DATA_DIR)')
 parser.add_argument('--resolution', type=int, default=64,
                     choices=[64, 128], help='Grid resolution (64 or 128)')
 
@@ -69,8 +72,9 @@ parser.add_argument('--ntest', type=int, default=200)
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-SAVE_DIR_CKPT = os.path.join('..', 'checkpoints')
-SAVE_DIR_RESULTS = os.path.join('..', 'results', args.save_name)
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SAVE_DIR_CKPT = os.path.join(REPO_ROOT, 'checkpoints')
+SAVE_DIR_RESULTS = os.path.join(REPO_ROOT, 'results', args.save_name)
 os.makedirs(SAVE_DIR_CKPT, exist_ok=True)
 os.makedirs(SAVE_DIR_RESULTS, exist_ok=True)
 

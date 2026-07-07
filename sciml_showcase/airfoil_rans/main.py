@@ -24,17 +24,13 @@ parser.add_argument('-s', '--score',
                     help='If you want to compute the score of the models on the associated test set. (default: 0)',
                     default=0, type=int)
 parser.add_argument('--my_path',
-                    default='/data/path', type=str)
+                    default=os.environ.get('AIRFRANS_DATA_DIR', '/data/path'), type=str,
+                    help='Path to the AirfRANS-style dataset (or set $AIRFRANS_DATA_DIR)')
 parser.add_argument('--save_path',
                     default='metrics', type=str)
 parser.add_argument('--sample', default=None, type=str)
 parser.add_argument('--n_boot', default=500000, type=int)
 args = parser.parse_args()
-if args.my_path == '/data/path':
-    default_hdd_path = '/media/HDD/anjali/gazania_transolver/Dataset'
-    if os.path.exists(default_hdd_path):
-        args.my_path = default_hdd_path
-        print(f"Dataset path not specified. Automatically using found mock dataset: {args.my_path}")
 
 with open(args.my_path + '/manifest.json', 'r') as f:
     manifest = json.load(f)

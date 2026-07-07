@@ -2,10 +2,12 @@
 Navier-Stokes Turbulence: Transolver vs FNO
 ============================================
 Trains Transolver on 2D turbulent Navier-Stokes data (64x64 vorticity fields)
-and generates publication-quality visualizations for the TPCRL lab pitch.
+and generates comparison visualizations for the Transolver-vs-FNO turbulence
+benchmark.
 
 Dataset:  ns_train_64.pt / ns_test_64.pt  (x: input vorticity, y: next-step vorticity)
-          Located at /media/HDD/mamta_backup/datasets/fno/navier_stokes/
+          Path is set via --data_path (defaults to the $NS_DATA_DIR
+          environment variable if set).
 
 Author:   Adapted from Transolver (ICML 2024) codebase for turbulence demo.
 """
@@ -35,8 +37,8 @@ from model_dict import get_model
 parser = argparse.ArgumentParser('Transolver — 2D NS Turbulence Prediction')
 
 parser.add_argument('--data_path', type=str,
-                    default='/media/HDD/mamta_backup/datasets/fno/navier_stokes',
-                    help='Path to ns_train_64.pt and ns_test_64.pt')
+                    default=os.environ.get('NS_DATA_DIR', ''),
+                    help='Path to ns_train_64.pt and ns_test_64.pt (or set $NS_DATA_DIR)')
 parser.add_argument('--resolution', type=int, default=64,
                     choices=[64, 128], help='Grid resolution (64 or 128)')
 
@@ -72,8 +74,9 @@ parser.add_argument('--ntest', type=int, default=200)
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-SAVE_DIR_CKPT = os.path.join('..', 'checkpoints')
-SAVE_DIR_RESULTS = os.path.join('..', 'results', args.save_name)
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SAVE_DIR_CKPT = os.path.join(REPO_ROOT, 'checkpoints')
+SAVE_DIR_RESULTS = os.path.join(REPO_ROOT, 'results', args.save_name)
 os.makedirs(SAVE_DIR_CKPT, exist_ok=True)
 os.makedirs(SAVE_DIR_RESULTS, exist_ok=True)
 

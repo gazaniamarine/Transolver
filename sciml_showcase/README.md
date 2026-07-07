@@ -1,92 +1,86 @@
-# 🌌 SciML Computational Surrogate Portfolio
-> **Accelerating High-Fidelity Aerodynamic Design & Turbulence Analysis via Mesh-Independent Operators**
+# SciML Showcase: Turbulence and Aerodynamics Benchmarking
 
-This showcase directory hosts a rigorous, physics-aware computational portfolio designed to accelerate aerodynamic design loops and automate turbulence field analyses. 
+This directory contains two extensions built on top of the upstream
+[Transolver](https://github.com/thuml/Transolver) (Wu et al., ICML 2024)
+codebase: a Transolver-vs-FNO benchmark on 2D Navier-Stokes turbulence, and
+an unstructured-grid (VTU/VTP) training pipeline for airfoil RANS surrogates.
+See the [root README](../README.md) for overall repo attribution.
 
-Rather than aiming to "replace" classical, safety-critical numerical CFD solvers, this framework serves as an **ultra-fast computational surrogate** and a **spatial data-engineering platform**—drastically reducing design-loop iteration time and supercomputer costs.
+Neither pipeline is intended to replace classical numerical CFD solvers.
+The goal is a fast, mesh-independent surrogate that can support design-loop
+iteration and data-engineering around existing solvers.
 
----
+## Directory structure
 
-## 📂 Portfolio Structure & Navigation
+* [`ns_turbulence/`](ns_turbulence) — Phase 1: 2D Navier-Stokes vorticity dynamics
+  * [`exp_ns_turbulence.py`](ns_turbulence/exp_ns_turbulence.py) — Trains the Transolver operator.
+  * [`exp_fno_baseline.py`](ns_turbulence/exp_fno_baseline.py) — Trains the Fourier Neural Operator (FNO) baseline under identical normalization.
+  * [`compare_models.py`](ns_turbulence/compare_models.py) — Evaluation suite (relative L2 curves, parameter counts, inference latency, side-by-side vorticity contours, 1D radial energy spectrum).
+* [`airfoil_rans/`](airfoil_rans) — Phase 2: geometry-general unstructured-grid surrogates
+  * [`generate_mock_airfrans.py`](airfoil_rans/generate_mock_airfrans.py) — Generates a synthetic AirfRANS-style unstructured grid dataset (quadrilateral VTU internal grid, VTP surface boundary) to exercise the pipeline end-to-end.
+  * [`main.py`](airfoil_rans/main.py) — Geometry-general surrogate training over volume/surface boundaries with coordinate projection and a weighted surface+volume loss.
 
-*   **`ns_turbulence/`** — [Phase 1: 2D Navier-Stokes Vorticity Dynamics](file:///home/gazania/zania_folder/Transolver/sciml_showcase/ns_turbulence)
-    *   [`exp_ns_turbulence.py`](file:///home/gazania/zania_folder/Transolver/sciml_showcase/ns_turbulence/exp_ns_turbulence.py) — Trains the state-space attention-based **Transolver** operator.
-    *   [`exp_fno_baseline.py`](file:///home/gazania/zania_folder/Transolver/sciml_showcase/ns_turbulence/exp_fno_baseline.py) — Trains the standard **Fourier Neural Operator (FNO)** baseline under identical global normalizations.
-    *   [`compare_models.py`](file:///home/gazania/zania_folder/Transolver/sciml_showcase/ns_turbulence/compare_models.py) — Rigorous evaluation suite (Relative $L_2$ curves, parameter efficiency, inference latencies, side-by-side vorticity contours, and 1D radial energy spectrum analysis).
-*   **`airfoil_rans/`** — [Phase 2: Geometry-General Unstructured Grid Surrogates](file:///home/gazania/zania_folder/Transolver/sciml_showcase/airfoil_rans)
-    *   [`generate_mock_airfrans.py`](file:///home/gazania/zania_folder/Transolver/sciml_showcase/airfoil_rans/generate_mock_airfrans.py) — Generates synthetic, physically-consistent unstructured grid datasets (using quadrilateral VTU internal grids and VTP surface boundaries) to dry-run the pipeline.
-    *   [`main.py`](file:///home/gazania/zania_folder/Transolver/sciml_showcase/airfoil_rans/main.py) — Geometry-general surrogate training supporting custom volume-to-surface boundaries, coordinates projections, and physics-consistent losses.
+## Phase 1: 2D Navier-Stokes turbulence benchmark
 
----
+**Objective**: train continuous, mesh-independent operators to predict
+next-step vorticity fields and check that the learned dynamics obey the
+expected turbulence energy-cascade scaling.
 
-## 🏎️ Phase 1: 2D Navier-Stokes Turbulence Benchmark
-**Objective**: Train continuous, spatiotemporal operators to predict chaotic vorticity dynamics while validating physical scaling laws.
+### Results
 
-### 📊 Scientific and Physical Results
+* **Transolver**: test relative L2 error of `0.00402` (0.402%) with `183k` trainable parameters.
+* **FNO baseline**: test relative L2 error of `0.00461` (0.461%) with `1.42M` trainable parameters.
+* Transolver reaches comparable-or-better accuracy with roughly **8x fewer parameters** than the FNO baseline.
 
-1.  **Strict Performance Benchmarking**:
-    *   **Transolver (SOTA)**: Achieves a test Relative $L_2$ error of **`0.00402` (0.40% error)** with only **`183k` trainable parameters**.
-    *   **FNO Baseline**: Achieves **`0.00461` (0.46% error)** but requires **`1.42M` trainable parameters**.
-    *   *Result*: Transolver achieves a **1.5x lower error convergence** while being **10x more parameter-efficient**!
-2.  **Kolmogorov $k^{-5/3}$ Energy Cascade Consistency**:
-    *   Instead of relying on black-box ML losses, `compare_models.py` projects predicted vorticity fields into Fourier space to compute the **1D radial energy spectrum $E(k)$**.
-    *   Both models are checked against the analytical **Kolmogorov inertial-range decay rate ($k^{-5/3}$)** to verify that the neural operator correctly captures multi-scale physical energy transfers rather than filtering out small-scale turbulent eddies.
+<!-- TODO: add figure — results/comparison_ns/loss_curves_comparison.png -->
 
-### 🚀 Running the Experiments (on GPU 1)
+* **Kolmogorov k^(-5/3) energy-cascade check**: `compare_models.py` projects predicted vorticity fields into Fourier space to compute the 1D radial energy spectrum E(k) and compares it against the analytical Kolmogorov inertial-range decay rate (k^(-5/3)), to check that the operator reproduces multi-scale energy transfer rather than smoothing out small-scale eddies.
 
-Make sure you are in the `transolver` Conda environment:
+<!-- TODO: add figure — results/comparison_ns/energy_spectrum_comparison.png -->
+<!-- TODO: add figure — results/comparison_ns/flow_comparison_showcase_5.png -->
+
+### Running the experiments
+
+Set the dataset location once:
 ```bash
-source /home/mamta/miniconda3/etc/profile.d/conda.sh
-conda activate transolver
+export NS_DATA_DIR=/path/to/fno/navier_stokes   # contains ns_train_64.pt, ns_test_64.pt
 ```
 
-Execute Transolver and FNO training:
+Train Transolver and the FNO baseline:
 ```bash
-# Train Transolver (uses `--gpu 1` to target the free GPU)
-python3 sciml_showcase/ns_turbulence/exp_ns_turbulence.py --gpu 1
-
-# Train FNO Baseline
-python3 sciml_showcase/ns_turbulence/exp_fno_baseline.py --gpu 1
+python3 sciml_showcase/ns_turbulence/exp_ns_turbulence.py --gpu 0
+python3 sciml_showcase/ns_turbulence/exp_fno_baseline.py --gpu 0
 ```
 
-Run the multi-model comparison suite:
+The FNO baseline imports the `neuraloperator` package
+(https://github.com/neuraloperator/neuraloperator). If it is not
+pip-installed, point `$NEURALOPERATOR_DIR` at a local checkout.
+
+Run the comparison suite:
 ```bash
 python3 sciml_showcase/ns_turbulence/compare_models.py
 ```
-*Outputs will be saved in `results/comparison_ns/`, including `loss_curves_comparison.png`, `energy_spectrum_comparison.png`, and `flow_comparison_showcase_5.png`.*
+Outputs are written to `results/comparison_ns/` (overridable via
+`$NS_RESULTS_DIR`), including `loss_curves_comparison.png`,
+`energy_spectrum_comparison.png`, and `flow_comparison_showcase_5.png`.
 
----
+## Phase 2: unstructured-grid aerodynamics (AirfRANS-style)
 
-## ✈️ Phase 2: Unstructured Grid Aerodynamics (AirfRANS)
-**Objective**: Predict RANS (Reynolds-Averaged Navier-Stokes) turbulent flow fields (velocity $U$, pressure $p$, and turbulent viscosity $\nu_t$) around arbitrary 2D airfoils on unstructured mesh grids under varying Reynolds numbers and angles of attack.
+**Objective**: predict RANS flow fields (velocity U, pressure p, turbulent
+viscosity nu_t) around 2D airfoils on unstructured mesh grids, for varying
+Reynolds number and angle of attack.
 
-### 🛠️ Scientific and Data-Engineering Strengths
-*   **Unstructured Grid Parsing**: Direct handling of unstructured `.vtu` (internal fluid volumes) and `.vtp` (surface walls) formats using **PyVista** and **VTK**. Handles irregular geometries that standard CNNs fail to process.
-*   **Massive Computational Speedups**: Predicts the complete boundary layer and wake flow field in **milliseconds** on a single GPU, enabling rapid aerodynamic design pre-screening without running full hours-long finite volume simulations.
+* **Unstructured grid parsing**: reads `.vtu` (internal fluid volume) and `.vtp` (surface wall) meshes with PyVista and VTK.
+* **Status**: the pipeline is validated end-to-end on synthetic (mock)
+  AirfRANS-style geometries generated by `generate_mock_airfrans.py`.
+  Real-dataset (AirfRANS) benchmarking is pending — no result logs for a
+  real-dataset run exist in this repo yet.
 
-### 🚀 Running the Experiments (Mock Dataset Verification)
+### Running the experiments (mock dataset)
 
-Generate the mock unstructured grid dataset:
 ```bash
+export AIRFRANS_DATA_DIR=/path/to/dataset   # or omit to use a local ./mock_dataset
+
 python3 sciml_showcase/airfoil_rans/generate_mock_airfrans.py
+python3 sciml_showcase/airfoil_rans/main.py --model Transolver --weight 10.0
 ```
-
-Run the training pipeline on the mock geometries to verify the grid coordinate projection and loss weighting:
-```bash
-python3 sciml_showcase/airfoil_rans/main.py --model Transolver --my_path /media/HDD/anjali/gazania_transolver/Dataset --weight 10.0
-```
-
----
-
-## 🎓 The TPCRL Academic Pitch Guide
-
-If you are presenting this work to **Prof. Rishita Das** at **Aerospace IISc Bangalore**, frame your contributions around their lab's active research themes using this guide:
-
-### 1. The "Information-Theoretic Entropy Probe" Angle
-> *“Prof. Das's research leverages information theory to analyze turbulence. In this portfolio, I studied how Transolver represents continuous operators by mapping coordinates into $K$ learnable **'physics slices' (attention states)** rather than grid indices. I propose using these learned physics slices as direct mathematical probes—computing the **Mutual Information** and **Kullback-Leibler (KL) Divergence** between slices to map scale-to-scale energy transfers and spatial boundary coupling in turbulent boundary layers.”*
-
-### 2. The "Pre-screening surrogate" Angle (No replacements!)
-> *“I recognize the absolute safety-critical need for numerical solver mathematical guarantees. My research focus is not replacing solvers, but using mesh-independent neural operators as **fast pre-screeners**. By running surrogates to predict RANS flows around airfoils in milliseconds, we can pre-screen 10,000 design geometries, identify the top 10 candidates, and only run expensive, high-fidelity CFD codes (like OpenFOAM or SU2) on those few. This slashes supercomputer queue times and core-hour budgets by up to 90%.”*
-
-### 3. The "Computational Data Support" Angle
-> *“My core strength lies in **scientific computing, GPU-acceleration, and unstructured mesh data-engineering**. I want to support your lab's fluid mechanics experts by building automated data pipelines (using PyVista/VTK) to load, post-process, and align your massive DNS and LES datasets, letting your researchers focus fully on the physical insights.”*

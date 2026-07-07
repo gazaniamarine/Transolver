@@ -3,7 +3,7 @@ import sys
 import os
 
 # Set up paths
-repo_root = '/home/gazania/zania_folder/Transolver/Car-Design-ShapeNetCar'
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(repo_root)
 
 from dataset.load_dataset import load_train_val_fold

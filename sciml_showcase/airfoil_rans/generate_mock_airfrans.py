@@ -13,7 +13,7 @@ import json
 import numpy as np
 import pyvista as pv
 
-MOCK_DIR = "/media/HDD/anjali/gazania_transolver/Dataset"
+MOCK_DIR = os.environ.get('AIRFRANS_DATA_DIR', os.path.join(os.path.dirname(__file__), 'mock_dataset'))
 os.makedirs(MOCK_DIR, exist_ok=True)
 
 geometries = [

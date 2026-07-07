@@ -1,84 +1,53 @@
-# Transolver (ICML 2024 Spotlight)
+# Transolver: Reproduction & Turbulence/Aerodynamics Benchmarking
 
-:triangular_flag_on_post:**News** (2026.02) We present a new member of the Transolver Family, named [Transolver-3](https://arxiv.org/pdf/2602.04940), which can handle **100-million-scale** geometries with SOTA results in full-size DrivAerML.
+This repository builds on **Transolver** (Wu et al., *ICML 2024*,
+[thuml/Transolver](https://github.com/thuml/Transolver)). The core
+architecture ([`Physics_Attention.py`](Physics_Attention.py)) and the
+standard-benchmark code
+([`PDE-Solving-StandardBenchmark/`](PDE-Solving-StandardBenchmark),
+[`Car-Design-ShapeNetCar/`](Car-Design-ShapeNetCar),
+[`Airfoil-Design-AirfRANS/`](Airfoil-Design-AirfRANS)) are the original
+authors' work, reproduced here. Everything under [`sciml_showcase/`](sciml_showcase)
+is my own extension on top of that codebase (see "My contributions" below).
 
-:triangular_flag_on_post:**News** (2025.07) We have released the code of [Transolver++](https://arxiv.org/abs/2502.02414v1). Please check this [GitHub Repository](https://github.com/thuml/Transolver_plus).
-
-:triangular_flag_on_post:**News** (2025.04) We have released [Neural-Solver-Library](https://github.com/thuml/Neural-Solver-Library) as a simple and neat code base for PDE solving. It contains 17 well-reproduced neural solvers. Welcome to try this library and join the research in solving PDEs.
-
-:triangular_flag_on_post:**News** (2025.02) We present an upgraded version of Transolver, named [Transolver++](https://arxiv.org/abs/2502.02414v1), which can handle million-scale geometries in one GPU with more accurate results.
-
-:triangular_flag_on_post:**News** (2024.10) Transolver has been integrated into [NVIDIA physicsnemo](https://github.com/NVIDIA/physicsnemo/tree/main/examples/cfd/darcy_transolver).
-
-Transolver: A Fast Transformer Solver for PDEs on General Geometries [[Paper]](https://arxiv.org/abs/2402.02366) [[Slides]](https://wuhaixu2016.github.io/pdf/ICML2024_Transolver.pdf) [[Poster]](https://wuhaixu2016.github.io/pdf/poster_ICML2024_Transolver.pdf)
-
-In real-world applications, PDEs are typically discretized into large-scale meshes with complex geometries. To capture intricate physical correlations hidden under multifarious meshes, we propose the Transolver with the following features:
-
-- Going beyond previous work, Transolver **calculates attention among learned physical states** instead of mesh points, which empowers the model with **endogenetic geometry-general capability**.
-- Transolver achieves **22% error reduction over previous SOTA in six standard benchmarks** and excels in **large-scale industrial simulations**, including car and airfoil designs.
-- Transolver presents favorable **efficiency, scalability and out-of-distrbution generalizability**.
+Transolver computes attention among a small number of learned physical
+states rather than directly over mesh points, which gives it mesh-independent,
+geometry-general behavior on PDEs discretized over complex, irregular grids.
 
 <p align="center">
-<img src=".\pic\Transolver.png" height = "250" alt="" align=center />
+<img src="pic/Transolver.png" height="250" alt="Transolver architecture overview" align="center" />
 <br><br>
-<b>Figure 1.</b> Overview of Transolver.
+<b>Figure 1.</b> Overview of Transolver (from Wu et al., 2024).
 </p>
 
+## Repository layout
 
-## Transolver v.s. Previous Transformer Operators
+* [`Physics_Attention.py`](Physics_Attention.py), [`PDE-Solving-StandardBenchmark/`](PDE-Solving-StandardBenchmark) — upstream Transolver architecture and the six standard PDE benchmarks (Darcy, NS, elasticity, plasticity, pipe, airfoil).
+* [`Car-Design-ShapeNetCar/`](Car-Design-ShapeNetCar), [`Airfoil-Design-AirfRANS/`](Airfoil-Design-AirfRANS) — upstream industrial design benchmarks.
+* [`sciml_showcase/`](sciml_showcase) — my extensions: a Transolver-vs-FNO turbulence benchmark and an unstructured-grid airfoil RANS pipeline.
 
-**All of the previous Transformer-based neural operators directly apply attention to mesh points.** However, the massive mesh points in practical applications will cause challenges in both computation cost and capturing physical correlations.
+## My contributions
 
-Transolver is based on a more foundational idea, that is **learning intrinsic physical states under complex geometrics**. This design frees our model from superficial and unwieldy meshes and focuses more on physics modeling.
-
-As shown below, **Transolver can precisely capture miscellaneous physical states of PDEs**, such as (a) various fluid-structure interactions in a Darcy flow, (b) different extrusion regions of elastic materials, (c) shock wave and wake flow around the airfoil, (d) front-back surfaces and up-bottom spaces of driving cars.
-
-<p align="center">
-<img src=".\pic\physical_states.png" height = "300" alt="" align=center />
-<br><br>
-<b>Figure 2.</b> Visualization of learned physical states.
-</p>
-
-## Get Started
-
-1. Please refer to different folders for detailed experiment instructions.
-
-2. List of experiments:
-
-- Core code: see [./Physics_Attention.py](https://github.com/thuml/Transolver/blob/main/Physics_Attention.py)
-- Standard benchmarks: see [./PDE-Solving-StandardBenchmark](https://github.com/thuml/Transolver/tree/main/PDE-Solving-StandardBenchmark)
-- Car design task: see [./Car-Design-ShapeNetCar](https://github.com/thuml/Transolver/tree/main/Car-Design-ShapeNetCar)
-- Airfoil design task: see [./Airfoil-Design-AirfRANS](https://github.com/thuml/Transolver/tree/main/Airfoil-Design-AirfRANS)
+* **[`sciml_showcase/ns_turbulence`](sciml_showcase/ns_turbulence)** — Transolver vs. FNO benchmark on 2D Navier-Stokes vorticity dynamics (64x64 resolution), including energy-spectrum validation against the Kolmogorov k^(-5/3) inertial-range decay.
+* **[`sciml_showcase/airfoil_rans`](sciml_showcase/airfoil_rans)** — unstructured-grid (VTU/VTP, PyVista) training pipeline for airfoil RANS surrogates, validated end-to-end on synthetic geometries.
 
 ## Results
 
-Transolver achieves consistent state-of-the-art in **six standard benchmarks and two practical design tasks**. **More than 20 baselines are compared.**
+On the 2D Navier-Stokes turbulence benchmark
+([`sciml_showcase/ns_turbulence`](sciml_showcase/ns_turbulence)):
 
-<p align="center">
-<img src=".\PDE-Solving-StandardBenchmark\fig\standard_benchmark.png" height = "300" alt="" align=center />
-<br><br>
-<b>Table 1.</b> Results on six standard benchmarks.
-</p>
+**Transolver: 0.402% rel-L2 at 183K params vs. FNO: 0.461% rel-L2 at 1.42M
+params — comparable-or-better accuracy with ~8x fewer parameters.**
 
-<p align="center">
-<img src=".\Airfoil-Design-AirfRANS\fig\results.png" height = "300" alt="" align=center />
-<br><br>
-<b>Table 2.</b> Results on two design tasks: Car and Airfoild design.
-</p>
+<!-- TODO: add figure — results/comparison_ns/loss_curves_comparison.png -->
+<!-- TODO: add figure — results/comparison_ns/energy_spectrum_comparison.png -->
 
-## Showcases
+See [`sciml_showcase/README.md`](sciml_showcase/README.md) for the full
+writeup, including the airfoil RANS pipeline status.
 
-<p align="center">
-<img src=".\pic\showcases.png" height = "300" alt="" align=center />
-<br><br>
-<b>Figure 3.</b> Comparison of Transolver and other models.
-</p>
+## Citation (upstream work)
 
-- Application of Transolver for crash dynamics modeling: [https://arxiv.org/pdf/2510.15201](https://arxiv.org/pdf/2510.15201)
-
-## Citation
-
-If you find this repo useful, please cite our paper. 
+If you use Transolver itself, please cite the original paper:
 
 ```
 @inproceedings{wu2024Transolver,
@@ -89,18 +58,19 @@ If you find this repo useful, please cite our paper.
 }
 ```
 
-## Contact
+Paper: [arXiv:2402.02366](https://arxiv.org/abs/2402.02366) ·
+Upstream repository: [thuml/Transolver](https://github.com/thuml/Transolver)
 
-If you have any questions or want to use the code, please contact [wuhx23@mails.tsinghua.edu.cn](mailto:wuhx23@mails.tsinghua.edu.cn).
+## Acknowledgement (upstream)
 
-## Acknowledgement
+The upstream authors acknowledge the following repositories for valuable
+code and datasets:
 
-We appreciate the following github repos a lot for their valuable code base or datasets:
+* https://github.com/neuraloperator/neuraloperator
+* https://github.com/neuraloperator/Geo-FNO
+* https://github.com/thuml/Latent-Spectral-Models
+* https://github.com/Extrality/AirfRANS
 
-https://github.com/neuraloperator/neuraloperator
+## License
 
-https://github.com/neuraloperator/Geo-FNO
-
-https://github.com/thuml/Latent-Spectral-Models
-
-https://github.com/Extrality/AirfRANS
+MIT License, Copyright (c) 2024 THUML @ Tsinghua University. See [LICENSE](LICENSE).

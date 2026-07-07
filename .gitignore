@@ -162,8 +162,17 @@ cython_debug/
 # Datasets
 Car-Design-ShapeNetCar/dataset/mlcfd_data
 data/
-Garrett_data/
-results/
 checkpoints/
-**/results/
 **/checkpoints/
+
+# Run outputs (raw dumps) - excluded except curated evidence figures below
+results/*
+!results/comparison_ns/
+**/results/*
+!**/results/comparison_ns/
+
+# Model checkpoints / binaries
+*.pth
+*.pt
+metrics/full/Transolver/model
+metrics/full/Transolver/Transolver

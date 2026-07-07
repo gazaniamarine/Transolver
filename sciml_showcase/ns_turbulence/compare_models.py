@@ -1,8 +1,8 @@
 """
 Compare Transolver and FNO baseline on 2D Navier-Stokes Turbulence
 ==================================================================
-This script performs a rigorous, publication-grade scientific comparison between
-the trained Transolver model and the FNO baseline.
+This script performs a rigorous scientific comparison between the trained
+Transolver model and the FNO baseline.
 
 It generates:
 1. Relative L2 error convergence history (Transolver vs FNO).
@@ -23,23 +23,25 @@ import matplotlib.gridspec as gridspec
 from torch.utils.data import DataLoader
 
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "PDE-Solving-StandardBenchmark")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-sys.path.append('/home/gazania/zania_folder/neuraloperator')
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.append(os.path.join(REPO_ROOT, "PDE-Solving-StandardBenchmark"))
+sys.path.append(REPO_ROOT)
+if os.environ.get('NEURALOPERATOR_DIR'):
+    sys.path.append(os.environ['NEURALOPERATOR_DIR'])
 
 from model_dict import get_model
 from neuralop.models import FNO
 
 # 1. Coordinate and Path Configurations
-RESULTS_DIR = "/home/gazania/zania_folder/Transolver/results/comparison_ns"
+RESULTS_DIR = os.environ.get('NS_RESULTS_DIR', os.path.join(REPO_ROOT, "results", "comparison_ns"))
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # Datasets and Checkpoints
-DATA_DIR = "/media/HDD/mamta_backup/datasets/fno/navier_stokes"
-TRANSOLVER_CHECKPOINT = "/home/gazania/zania_folder/Transolver/checkpoints/ns_turbulence_transolver.pt"
-FNO_CHECKPOINT = "/home/gazania/zania_folder/Transolver/checkpoints/ns_turbulence_fno.pt"
-TRANSOLVER_LOG = "/home/gazania/zania_folder/Transolver/results/ns_turbulence_training.log"
-FNO_LOG = "/home/gazania/zania_folder/Transolver/results/ns_turbulence_fno_training.log"
+DATA_DIR = os.environ.get('NS_DATA_DIR', '')
+TRANSOLVER_CHECKPOINT = os.path.join(REPO_ROOT, "checkpoints", "ns_turbulence_transolver.pt")
+FNO_CHECKPOINT = os.path.join(REPO_ROOT, "checkpoints", "ns_turbulence_fno.pt")
+TRANSOLVER_LOG = os.path.join(REPO_ROOT, "results", "ns_turbulence_training.log")
+FNO_LOG = os.path.join(REPO_ROOT, "results", "ns_turbulence_fno_training.log")
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 print(f"[Comparison] Using device: {device}")
