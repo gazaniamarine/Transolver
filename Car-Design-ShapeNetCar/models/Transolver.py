@@ -35,6 +35,7 @@ class Physics_Attention_Irregular_Mesh(nn.Module):
     def forward(self, x):
         # B N C
         B, N, C = x.shape
+        # print(f"[Attention Input] x: {x.shape}")
 
         ### (1) Slice
         fx_mid = self.in_project_fx(x).reshape(B, N, self.heads, self.dim_head) \
@@ -45,6 +46,7 @@ class Physics_Attention_Irregular_Mesh(nn.Module):
         slice_norm = slice_weights.sum(2)  # B H G
         slice_token = torch.einsum("bhnc,bhng->bhgc", fx_mid, slice_weights)
         slice_token = slice_token / ((slice_norm + 1e-5)[:, :, :, None].repeat(1, 1, 1, self.dim_head))
+        # print(f"  [Attention Slice] slice_token: {slice_token.shape}")
 
         ### (2) Attention among slice tokens
         q_slice_token = self.to_q(slice_token)
@@ -54,11 +56,14 @@ class Physics_Attention_Irregular_Mesh(nn.Module):
         attn = self.softmax(dots)
         attn = self.dropout(attn)
         out_slice_token = torch.matmul(attn, v_slice_token)  # B H G D
+        # print(f"  [Attention Core] out_slice_token: {out_slice_token.shape}")
 
         ### (3) Deslice
         out_x = torch.einsum("bhgc,bhng->bhnc", out_slice_token, slice_weights)
         out_x = rearrange(out_x, 'b h n d -> b n (h d)')
-        return self.to_out(out_x)
+        out = self.to_out(out_x)
+        # print(f"[Attention Output] out: {out.shape}")
+        return out
 
 
 class MLP(nn.Module):
@@ -79,14 +84,16 @@ class MLP(nn.Module):
         self.linears = nn.ModuleList([nn.Sequential(nn.Linear(n_hidden, n_hidden), act()) for _ in range(n_layers)])
 
     def forward(self, x):
+        # print(f"  [MLP Input] x: {x.shape}")
         x = self.linear_pre(x)
         for i in range(self.n_layers):
             if self.res:
                 x = self.linears[i](x) + x
             else:
                 x = self.linears[i](x)
-        x = self.linear_post(x)
-        return x
+        out = self.linear_post(x)
+        # print(f"  [MLP Output] out: {out.shape}")
+        return out
 
 
 class Transolver_block(nn.Module):
@@ -115,10 +122,18 @@ class Transolver_block(nn.Module):
             self.mlp2 = nn.Linear(hidden_dim, out_dim)
 
     def forward(self, fx):
-        fx = self.Attn(self.ln_1(fx)) + fx
-        fx = self.mlp(self.ln_2(fx)) + fx
+        # print(f"--- Block Start ---")
+        # print(f"Input: {fx.shape}")
+        attn_out = self.Attn(self.ln_1(fx))
+        # print(f"After Attention: {attn_out.shape}")
+        fx = attn_out + fx
+        mlp_out = self.mlp(self.ln_2(fx))
+        # print(f"After MLP: {mlp_out.shape}")
+        fx = mlp_out + fx
         if self.last_layer:
-            return self.mlp2(self.ln_3(fx))
+            out = self.mlp2(self.ln_3(fx))
+            # print(f"After Last Layer MLP: {out.shape}")
+            return out
         else:
             return fx
 
@@ -196,9 +211,13 @@ class Model(nn.Module):
         cfd_data, geom_data = data
         x, fx, T = cfd_data.x, None, None
         x = x[None, :, :]
+        # print(f"\n[Model Forward Start]")
+        # print(f"Initial Input x: {x.shape}")
+        
         if self.unified_pos:
             new_pos = self.get_grid(cfd_data.pos[None, :, :])
             x = torch.cat((x, new_pos), dim=-1)
+            # print(f"After unified_pos grid cat: {x.shape}")
 
         if fx is not None:
             fx = torch.cat((x, fx), -1)
@@ -206,8 +225,11 @@ class Model(nn.Module):
         else:
             fx = self.preprocess(x)
             fx = fx + self.placeholder[None, None, :]
+        # print(f"After Preprocess: {fx.shape}")
 
-        for block in self.blocks:
+        for i, block in enumerate(self.blocks):
+            # print(f"\n[Block {i}]")
             fx = block(fx)
 
+        # print(f"\nModel Output: {fx[0].shape}\n")
         return fx[0]

@@ -158,3 +158,18 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Datasets
+Car-Design-ShapeNetCar/dataset/mlcfd_data
+data/
+Garrett_data/
+results/
+checkpoints/
+**/results/
+**/checkpoints/
+
+# Model checkpoints / binaries
+*.pth
+*.pt
+**/metrics/**/model
+**/metrics/**/Transolver
