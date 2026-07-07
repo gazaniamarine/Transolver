@@ -1,0 +1,6 @@
+# Additional dependencies for sciml_showcase/, on top of the root requirements.txt
+# (torch, numpy, pyvista, vtk are also required and listed there).
+matplotlib
+tqdm
+pyyaml
+neuraloperator   # FNO baseline; see https://github.com/neuraloperator/neuraloperator
