@@ -28,19 +28,23 @@ geometry-general behavior on PDEs discretized over complex, irregular grids.
 
 ## My contributions
 
-* **[`sciml_showcase/ns_turbulence`](sciml_showcase/ns_turbulence)** — Transolver vs. FNO benchmark on 2D Navier-Stokes vorticity dynamics (64x64 resolution), including energy-spectrum validation against the Kolmogorov k^(-5/3) inertial-range decay.
+* **[`sciml_showcase/ns_turbulence`](sciml_showcase/ns_turbulence)** — Transolver vs. FNO benchmark on 2D Navier-Stokes vorticity dynamics (128x128 resolution), including energy-spectrum validation against the Kolmogorov k^(-5/3) inertial-range decay.
 * **[`sciml_showcase/airfoil_rans`](sciml_showcase/airfoil_rans)** — unstructured-grid (VTU/VTP, PyVista) training pipeline for airfoil RANS surrogates, validated end-to-end on synthetic geometries.
 
 ## Results
 
 On the 2D Navier-Stokes turbulence benchmark
-([`sciml_showcase/ns_turbulence`](sciml_showcase/ns_turbulence)):
+([`sciml_showcase/ns_turbulence`](sciml_showcase/ns_turbulence), 128x128
+resolution, 300 epochs each, default hyperparameters):
 
-**Transolver: 0.402% rel-L2 at 183K params vs. FNO: 0.461% rel-L2 at 1.42M
-params — comparable-or-better accuracy with ~8x fewer parameters.**
+**FNO: 0.144 rel-L2 at 2.80M params vs. Transolver: 0.395 rel-L2 at 1.42M
+params — FNO is ~2.7x more accurate and ~3.8x faster at inference;
+Transolver uses ~2x fewer parameters.** See
+[`sciml_showcase/README.md`](sciml_showcase/README.md) for the full
+comparison table and a caveat on an earlier degenerate 64x64 dataset.
 
-<!-- TODO: add figure — results/comparison_ns/loss_curves_comparison.png -->
-<!-- TODO: add figure — results/comparison_ns/energy_spectrum_comparison.png -->
+![Loss curves](results/comparison_ns/loss_curves_comparison.png)
+![Energy spectrum](results/comparison_ns/energy_spectrum_comparison.png)
 
 See [`sciml_showcase/README.md`](sciml_showcase/README.md) for the full
 writeup, including the airfoil RANS pipeline status.

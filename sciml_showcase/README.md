@@ -28,41 +28,71 @@ expected turbulence energy-cascade scaling.
 
 ### Results
 
-* **Transolver**: test relative L2 error of `0.00402` (0.402%) with `183k` trainable parameters.
-* **FNO baseline**: test relative L2 error of `0.00461` (0.461%) with `1.42M` trainable parameters.
-* Transolver reaches comparable-or-better accuracy with roughly **8x fewer parameters** than the FNO baseline.
+Measured on the 128x128 NS-forcing dataset (`nsforcing_train_128.pt` /
+`nsforcing_test_128.pt`, 1000 train / 200 test samples used), both models
+trained for 300 epochs with matched normalization, loss, and grid
+coordinates:
 
-<!-- TODO: add figure — results/comparison_ns/loss_curves_comparison.png -->
+| Metric | FNO baseline | Transolver |
+| :--- | :---: | :---: |
+| Test relative L2 error | **0.144 ± 0.017** | 0.395 ± 0.040 |
+| Trainable parameters | 2.80M | **1.42M** |
+| Avg. inference latency (per sample) | **2.04 ms** | 7.80 ms |
 
-* **Kolmogorov k^(-5/3) energy-cascade check**: `compare_models.py` projects predicted vorticity fields into Fourier space to compute the 1D radial energy spectrum E(k) and compares it against the analytical Kolmogorov inertial-range decay rate (k^(-5/3)), to check that the operator reproduces multi-scale energy transfer rather than smoothing out small-scale eddies.
+FNO reaches roughly **2.7x lower error** and **3.8x lower latency** here;
+Transolver uses **2x fewer parameters**. This is with each model's default
+hyperparameters and an identical 300-epoch budget — it is not a
+hyperparameter-tuned head-to-head, so treat it as a first honest baseline
+rather than a final verdict on either architecture.
 
-<!-- TODO: add figure — results/comparison_ns/energy_spectrum_comparison.png -->
-<!-- TODO: add figure — results/comparison_ns/flow_comparison_showcase_5.png -->
+> **Note on the dataset**: `ns_train_64.pt` / `ns_test_64.pt` (the 64x64
+> files originally shipped alongside the 128x128 ones) are degenerate — the
+> "samples" are near-duplicates of a single field (per-pixel variance across
+> samples is ~4 orders of magnitude below the spatial variance within one
+> sample), and the input field carries essentially no correlation with the
+> target (~0.01). A model can hit near-zero reported error there just by
+> learning the constant/mean field, which is not a meaningful benchmark.
+> Use the 128x128 `nsforcing_*` files instead.
+
+![Loss curves](../results/comparison_ns/loss_curves_comparison.png)
+
+* **Kolmogorov k^(-5/3) energy-cascade check**: `compare_models.py` projects predicted vorticity fields into Fourier space to compute the 1D radial energy spectrum E(k) and compares it against the analytical Kolmogorov inertial-range decay rate (k^(-5/3)). FNO's spectrum tracks the ground-truth decay closely through the small-scale (high-k) range; Transolver's flattens out at high k, i.e. it over-smooths fine-scale structure relative to FNO.
+
+![Energy spectrum](../results/comparison_ns/energy_spectrum_comparison.png)
+
+![Flow field comparison](../results/comparison_ns/flow_comparison_showcase_5.png)
 
 ### Running the experiments
 
-Set the dataset location once:
+Set the dataset location once. The scripts expect files named
+`ns_train_<res>.pt` / `ns_test_<res>.pt`; if you're using the real 128x128
+data (named `nsforcing_train_128.pt` / `nsforcing_test_128.pt` upstream),
+symlink them to the expected names in a local directory first:
 ```bash
-export NS_DATA_DIR=/path/to/fno/navier_stokes   # contains ns_train_64.pt, ns_test_64.pt
+mkdir -p /path/to/ns_data_128
+ln -s /path/to/fno/navier_stokes/nsforcing_train_128.pt /path/to/ns_data_128/ns_train_128.pt
+ln -s /path/to/fno/navier_stokes/nsforcing_test_128.pt  /path/to/ns_data_128/ns_test_128.pt
+export NS_DATA_DIR=/path/to/ns_data_128
 ```
 
 Train Transolver and the FNO baseline:
 ```bash
-python3 sciml_showcase/ns_turbulence/exp_ns_turbulence.py --gpu 0
-python3 sciml_showcase/ns_turbulence/exp_fno_baseline.py --gpu 0
+python3 sciml_showcase/ns_turbulence/exp_ns_turbulence.py --gpu 0 --resolution 128
+python3 sciml_showcase/ns_turbulence/exp_fno_baseline.py --gpu 0 --resolution 128
 ```
 
 The FNO baseline imports the `neuraloperator` package
 (https://github.com/neuraloperator/neuraloperator). If it is not
 pip-installed, point `$NEURALOPERATOR_DIR` at a local checkout.
 
-Run the comparison suite:
+Run the comparison suite (pass the same resolution via `$NS_RESOLUTION`):
 ```bash
+export NS_RESOLUTION=128
 python3 sciml_showcase/ns_turbulence/compare_models.py
 ```
 Outputs are written to `results/comparison_ns/` (overridable via
 `$NS_RESULTS_DIR`), including `loss_curves_comparison.png`,
-`energy_spectrum_comparison.png`, and `flow_comparison_showcase_5.png`.
+`energy_spectrum_comparison.png`, and `flow_comparison_showcase_{5,12,28}.png`.
 
 ## Phase 2: unstructured-grid aerodynamics (AirfRANS-style)
 

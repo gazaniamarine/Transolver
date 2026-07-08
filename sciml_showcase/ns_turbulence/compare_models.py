@@ -38,6 +38,7 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # Datasets and Checkpoints
 DATA_DIR = os.environ.get('NS_DATA_DIR', '')
+RESOLUTION = int(os.environ.get('NS_RESOLUTION', '64'))
 TRANSOLVER_CHECKPOINT = os.path.join(REPO_ROOT, "checkpoints", "ns_turbulence_transolver.pt")
 FNO_CHECKPOINT = os.path.join(REPO_ROOT, "checkpoints", "ns_turbulence_fno.pt")
 TRANSOLVER_LOG = os.path.join(REPO_ROOT, "results", "ns_turbulence_training.log")
@@ -171,9 +172,9 @@ def main():
         slice_num=args.slice_num,
         ref=args.ref,
         unified_pos=bool(args.unified_pos),
-        H=64, W=64
+        H=RESOLUTION, W=RESOLUTION
     ).to(device)
-    
+
     fno = FNO(
         n_modes=(12, 12),
         in_channels=1,
@@ -202,20 +203,25 @@ def main():
     print(f"  FNO Parameter Count:        {f_params:,}")
 
     # 3. Load Datasets
-    print("[3/5] Loading test dataset ...")
-    test_path = os.path.join(DATA_DIR, "ns_test_64.pt")
+    print("[3/5] Loading train/test datasets ...")
+    train_path = os.path.join(DATA_DIR, f"ns_train_{RESOLUTION}.pt")
+    test_path = os.path.join(DATA_DIR, f"ns_test_{RESOLUTION}.pt")
+    train_data = torch.load(train_path)
     test_data = torch.load(test_path)
-    
+
     # Match the exp_ns_turbulence structure:
-    test_x = test_data['x'].float().unsqueeze(-1) # Shape [200, 64, 64, 1]
-    test_y = test_data['y'].float().unsqueeze(-1) # Shape [200, 64, 64, 1]
-    
-    # Transolver Normalization
-    x_mean = test_x.mean()
-    x_std = test_x.std()
-    y_mean = test_y.mean()
-    y_std = test_y.std()
-    
+    train_x = train_data['x'][:1000].float().unsqueeze(-1)  # Shape [1000, H, W, 1]
+    train_y = train_data['y'][:1000].float().unsqueeze(-1)
+    test_x = test_data['x'][:200].float().unsqueeze(-1)  # Shape [200, H, W, 1]
+    test_y = test_data['y'][:200].float().unsqueeze(-1)
+
+    # Normalization must use TRAIN-set stats, matching what both models were
+    # actually trained/evaluated with in exp_ns_turbulence.py / exp_fno_baseline.py.
+    x_mean = train_x.mean()
+    x_std = train_x.std()
+    y_mean = train_y.mean()
+    y_std = train_y.std()
+
     test_x_norm = (test_x - x_mean) / (x_std + 1e-8)
     
     N_test = len(test_x)
@@ -226,13 +232,16 @@ def main():
     t_errors, f_errors = [], []
     t_times, f_times = [], []
     
-    # Grid coordinate setup for Transolver
-    H, W = 64, 64
-    grid_x = np.linspace(0, 1, W)
-    grid_y = np.linspace(0, 1, H)
-    grid_xx, grid_yy = np.meshgrid(grid_x, grid_y)
-    grid_coord = np.stack([grid_xx, grid_yy], axis=-1)
-    grid_coord = torch.tensor(grid_coord, dtype=torch.float).view(-1, 2).to(device) # [4096, 2]
+    # Grid coordinate setup for Transolver. Must match make_grid() in
+    # exp_ns_turbulence.py exactly (torch.meshgrid with indexing='ij'):
+    # numpy's default meshgrid uses indexing='xy', which transposes row/col
+    # relative to 'ij' and silently mismatches the coordinates the model saw
+    # during training.
+    H, W = RESOLUTION, RESOLUTION
+    gx = torch.linspace(0, 1, H)
+    gy = torch.linspace(0, 1, W)
+    gxx, gyy = torch.meshgrid(gx, gy, indexing='ij')
+    grid_coord = torch.stack([gxx.reshape(-1), gyy.reshape(-1)], dim=-1).to(device)  # [H*W, 2]
     
     gt_spectra_list, transolver_spectra_list, fno_spectra_list = [], [], []
     
@@ -248,7 +257,7 @@ def main():
             grid_in = grid_coord.unsqueeze(0) # [1, 4096, 2]
             out_trans = transolver(grid_in, x_in) # [1, 4096, 1]
             # Denormalize
-            out_trans = out_trans.view(64, 64, 1) * (y_std.to(device) + 1e-8) + y_mean.to(device)
+            out_trans = out_trans.view(RESOLUTION, RESOLUTION, 1) * (y_std.to(device) + 1e-8) + y_mean.to(device)
             t_times.append(time.time() - start)
             
             t_err = torch.norm(out_trans - y_true) / torch.norm(y_true)
@@ -288,15 +297,23 @@ def main():
     avg_f_spec = np.mean(fno_spectra_list, axis=0)
     
     # Save Quantitative Summary Markdown Table
+    err_winner = "FNO" if f_err_mean < t_err_mean else "Transolver"
+    err_ratio = max(f_err_mean, t_err_mean) / min(f_err_mean, t_err_mean)
+    param_winner = "FNO" if f_params < t_params else "Transolver"
+    param_ratio = max(f_params, t_params) / min(f_params, t_params)
+    time_winner = "FNO" if f_time_mean < t_time_mean else "Transolver"
+    time_ratio = max(f_time_mean, t_time_mean) / min(f_time_mean, t_time_mean)
+
     summary_path = os.path.join(RESULTS_DIR, "summary_metrics.md")
     with open(summary_path, 'w') as f:
         f.write("# Quantitative Performance Comparison Summary\n\n")
-        f.write("| Metric | FNO Baseline | Transolver (SOTA) | Gain / Comparison |\n")
+        f.write(f"Resolution: {RESOLUTION}x{RESOLUTION}\n\n")
+        f.write("| Metric | FNO Baseline | Transolver | Comparison |\n")
         f.write("| :--- | :---: | :---: | :---: |\n")
-        f.write(f"| **Test Relative L2 Error** | {f_err_mean:.5f} ± {f_err_std:.5f} | **{t_err_mean:.5f} ± {t_err_std:.5f}** | **{f_err_mean/t_err_mean:.2f}x Lower Error** |\n")
-        f.write(f"| **Parameter Count** | {f_params:,} | **{t_params:,}** | **{f_params/t_params:.1f}x Fewer Parameters** |\n")
-        f.write(f"| **Avg. Inference Latency (per sample)** | {f_time_mean:.2f} ms | **{t_time_mean:.2f} ms** | **{f_time_mean/t_time_mean:.2f}x Faster** |\n")
-        f.write("| **Mesh-Independence** | No (Rigid spatial grid representation) | **Yes** (Arbitrary query coordinates) | Transolver learns continuous spatial operators |\n")
+        f.write(f"| **Test Relative L2 Error** | {f_err_mean:.5f} ± {f_err_std:.5f} | {t_err_mean:.5f} ± {t_err_std:.5f} | {err_winner} lower by {err_ratio:.2f}x |\n")
+        f.write(f"| **Parameter Count** | {f_params:,} | {t_params:,} | {param_winner} has {param_ratio:.1f}x fewer |\n")
+        f.write(f"| **Avg. Inference Latency (per sample)** | {f_time_mean:.2f} ms | {t_time_mean:.2f} ms | {time_winner} faster by {time_ratio:.2f}x |\n")
+        f.write("| **Mesh-Independence** | No (Rigid spatial grid representation) | Yes (Arbitrary query coordinates) | Transolver learns continuous spatial operators |\n")
     print(f"  Saved quantitative summary table → {summary_path}")
 
     # Plot Energy Spectra Comparison
@@ -336,7 +353,7 @@ def main():
             x_in = x_sample.view(1, -1, 1) # [1, 4096, 1]
             grid_in = grid_coord.unsqueeze(0) # [1, 4096, 2]
             out_trans = transolver(grid_in, x_in)
-            out_trans = out_trans.view(64, 64, 1) * (y_std.to(device) + 1e-8) + y_mean.to(device)
+            out_trans = out_trans.view(RESOLUTION, RESOLUTION, 1) * (y_std.to(device) + 1e-8) + y_mean.to(device)
             y_trans_pred = out_trans.cpu().numpy().squeeze(-1)
             
             # FNO
